@@ -1,0 +1,403 @@
+-- Services
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local CoreGui = game:GetService("CoreGui")
+
+local LocalPlayer = Players.LocalPlayer
+local Camera = workspace.CurrentCamera
+
+-- ป้องกันรันซ้ำ
+if CoreGui:FindFirstChild("CleanHubGUI") then
+    CoreGui.CleanHubGUI:Destroy()
+end
+
+-- สร้าง ScreenGui หลัก
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "CleanHubGUI"
+ScreenGui.ResetOnSpawn = false
+pcall(function()
+    ScreenGui.Parent = CoreGui
+end)
+if not ScreenGui.Parent then
+    ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+end
+
+-- ==========================================
+-- 1. ปุ่มเปิด/ปิด GUI (สี่เหลี่ยมมุมมน 1:1, ลากขยับได้)
+-- ==========================================
+local ToggleButton = Instance.new("ImageButton")
+ToggleButton.Name = "ToggleButton"
+ToggleButton.Size = UDim2.new(0, 50, 0, 50)
+ToggleButton.Position = UDim2.new(0, 50, 0, 50)
+ToggleButton.Image = "rbxassetid://99208705043266"
+ToggleButton.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+ToggleButton.BorderSizePixel = 0
+ToggleButton.Parent = ScreenGui
+
+local UICornerBtn = Instance.new("UICorner")
+UICornerBtn.CornerRadius = UDim.new(0, 12)
+UICornerBtn.Parent = ToggleButton
+
+-- ระบบลากขยับปุ่ม
+local dragging, dragInput, dragStart, startPos
+ToggleButton.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = true
+        dragStart = input.Position
+        startPos = ToggleButton.Position
+        
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                dragging = false
+            end
+        end)
+    end
+end)
+
+ToggleButton.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+        dragInput = input
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+    if input == dragInput and dragging then
+        local delta = input.Position - dragStart
+        ToggleButton.Position = UDim2.new(
+            startPos.X.Scale, 
+            startPos.X.Offset + delta.X, 
+            startPos.Y.Scale, 
+            startPos.Y.Offset + delta.Y
+        )
+    end
+end)
+
+-- ==========================================
+-- 2. หน้าต่างเมนูหลัก
+-- ==========================================
+local MainFrame = Instance.new("Frame")
+MainFrame.Name = "MainFrame"
+MainFrame.Size = UDim2.new(0, 320, 0, 420)
+MainFrame.Position = UDim2.new(0.5, -160, 0.5, -210)
+MainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+MainFrame.BorderSizePixel = 0
+MainFrame.Visible = false
+MainFrame.Parent = ScreenGui
+
+local UICornerMain = Instance.new("UICorner")
+UICornerMain.CornerRadius = UDim.new(0, 10)
+UICornerMain.Parent = MainFrame
+
+ToggleButton.MouseButton1Click:Connect(function()
+    MainFrame.Visible = not MainFrame.Visible
+end)
+
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1, 0, 0, 45)
+Title.BackgroundTransparency = 1
+Title.Text = "CONTROL PANEL"
+Title.TextColor3 = Color3.fromRGB(255, 25, 255)
+Title.TextSize = 18
+Title.Font = Enum.Font.GothamBold
+Title.Parent = MainFrame
+
+local ScrollFrame = Instance.new("ScrollingFrame")
+ScrollFrame.Size = UDim2.new(1, 0, 1, -45)
+ScrollFrame.Position = UDim2.new(0, 0, 0, 45)
+ScrollFrame.BackgroundTransparency = 1
+ScrollFrame.BorderSizePixel = 0
+ScrollFrame.CanvasSize = UDim2.new(0, 0, 0, 460)
+ScrollFrame.ScrollBarThickness = 4
+ScrollFrame.Parent = MainFrame
+
+-- ==========================================
+-- ฟังก์ชันช่วยสร้าง UI
+-- ==========================================
+local function createToggle(name, yPos, callback)
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(0, 270, 0, 40)
+    btn.Position = UDim2.new(0, 15, 0, yPos)
+    btn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+    btn.Text = "  " .. name .. ": OFF"
+    btn.TextColor3 = Color3.fromRGB(200, 200, 200)
+    btn.TextSize = 14
+    btn.Font = Enum.Font.GothamMedium
+    btn.TextXAlignment = Enum.TextXAlignment.Left
+    btn.BorderSizePixel = 0
+    btn.Parent = ScrollFrame
+
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 6)
+    corner.Parent = btn
+
+    local state = false
+    btn.MouseButton1Click:Connect(function()
+        state = not state
+        if state then
+            btn.BackgroundColor3 = Color3.fromRGB(0, 170, 100)
+            btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+            btn.Text = "  " .. name .. ": ON"
+        else
+            btn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+            btn.TextColor3 = Color3.fromRGB(200, 200, 200)
+            btn.Text = "  " .. name .. ": OFF"
+        end
+        callback(state)
+    end)
+end
+
+local function createNumberBox(name, defaultVal, minVal, maxVal, yPos, callback)
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(0, 170, 0, 40)
+    label.Position = UDim2.new(0, 15, 0, yPos)
+    label.BackgroundTransparency = 1
+    label.Text = "  " .. name
+    label.TextColor3 = Color3.fromRGB(200, 200, 200)
+    label.TextSize = 14
+    label.Font = Enum.Font.GothamMedium
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.Parent = ScrollFrame
+
+    local textBox = Instance.new("TextBox")
+    textBox.Size = UDim2.new(0, 85, 0, 35)
+    textBox.Position = UDim2.new(0, 200, 0, yPos + 2.5)
+    textBox.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+    textBox.Text = tostring(defaultVal)
+    textBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+    textBox.TextSize = 14
+    textBox.Font = Enum.Font.GothamBold
+    textBox.ClearTextOnFocus = false
+    textBox.BorderSizePixel = 0
+    textBox.Parent = ScrollFrame
+
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 6)
+    corner.Parent = textBox
+
+    textBox.FocusLost:Connect(function()
+        local num = tonumber(textBox.Text)
+        if num then
+            num = math.clamp(num, minVal, maxVal)
+            textBox.Text = tostring(num)
+            callback(num)
+        else
+            textBox.Text = tostring(defaultVal)
+            callback(defaultVal)
+        end
+    end)
+end
+
+-- ==========================================
+-- ตัวแปรสถานะฟังก์ชันทั้งหมด
+-- ==========================================
+local headSizeEnabled = false
+local headSizeValue = 1
+
+local espLineEnabled = false
+local espBoxEnabled = false
+
+local aimbotEnabled = false
+local aimFovRadius = 100
+
+local rainbowAllEnabled = false
+
+-- ==========================================
+-- สร้างปุ่มตั้งค่าในเมนู
+-- ==========================================
+createNumberBox("Head Size (1-15)", 1, 1, 15, 10, function(val)
+    headSizeValue = val
+end)
+
+createToggle("Head Size Enabled", 60, function(state)
+    headSizeEnabled = state
+    if not state then
+        for _, player in ipairs(Players:GetPlayers()) do
+            if player ~= LocalPlayer and player.Character then
+                local head = player.Character:FindFirstChild("Head")
+                if head then
+                    head.Size = Vector3.new(2, 1, 1)
+                    head.CanCollide = true
+                end
+            end
+        end
+    end
+end)
+
+createToggle("ESP: Lines (เส้น)", 110, function(state)
+    espLineEnabled = state
+end)
+
+createToggle("ESP: Boxes (สี่เหลี่ยม)", 160, function(state)
+    espBoxEnabled = state
+end)
+
+createToggle("Aimbot Lock", 210, function(state)
+    aimbotEnabled = state
+end)
+
+createNumberBox("Aimbot FOV Size", 100, 30, 500, 260, function(val)
+    aimFovRadius = val
+end)
+
+createToggle("Rainbow Players (Wallhack)", 310, function(state)
+    rainbowAllEnabled = state
+end)
+
+-- ==========================================
+-- วงกลม FOV (อยู่กลางหน้าจอเป๊ะๆ)
+-- ==========================================
+local fovCircle = Drawing.new("Circle")
+fovCircle.Thickness = 2
+fovCircle.NumSides = 60
+fovCircle.Filled = false
+fovCircle.Visible = false
+
+local function getClosestPlayerToCenter()
+    local closestPlayer = nil
+    local shortestDistance = aimFovRadius
+    local screenCenter = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("Head") and player.Character:FindFirstChildOfClass("Humanoid") then
+            if player.Character.Humanoid.Health > 0 then
+                local headPos, onScreen = Camera:WorldToViewportPoint(player.Character.Head.Position)
+                if onScreen then
+                    local distance = (Vector2.new(headPos.X, headPos.Y) - screenCenter).Magnitude
+                    if distance < shortestDistance then
+                        shortestDistance = distance
+                        closestPlayer = player
+                    end
+                end
+            end
+        end
+    end
+    return closestPlayer
+end
+
+-- ==========================================
+-- ระบบ ESP Cache สำหรับ Lines & Boxes
+-- ==========================================
+local espCache = {}
+local function removeESP(player)
+    if espCache[player] then
+        if espCache[player].Line then espCache[player].Line:Remove() end
+        if espCache[player].Box then espCache[player].Box:Remove() end
+        espCache[player] = nil
+    end
+end
+Players.PlayerRemoving:Connect(removeESP)
+
+-- ==========================================
+-- ลูปหลักการทำงาน (RenderStepped)
+-- ==========================================
+RunService.RenderStepped:Connect(function()
+    local rainbowColor = Color3.fromHSV(tick() % 3 / 3, 1, 1)
+
+    -- 1. วงกลมกลางจอ & Aimbot ล็อคเป้า
+    local screenCenter = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+    fovCircle.Position = screenCenter
+    fovCircle.Radius = aimFovRadius
+    fovCircle.Color = rainbowColor
+    fovCircle.Visible = aimbotEnabled
+
+    if aimbotEnabled then
+        local target = getClosestPlayerToCenter()
+        if target and target.Character and target.Character:FindFirstChild("Head") then
+            Camera.CFrame = CFrame.new(Camera.CFrame.Position, target.Character.Head.Position)
+        end
+    end
+
+    -- 2. ตัวละครทุกคนเป็นสีรุ้ง (รวมหัว/แต่งกาย แบบมองทะลุกำแพง)
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player.Character then
+            for _, part in ipairs(player.Character:GetDescendants()) do
+                if rainbowAllEnabled then
+                    if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" then
+                        part.Color = rainbowColor
+                        part.Material = Enum.Material.Neon -- ทำให้เรืองแสงมองทะลุชัดเจนขึ้น
+                    elseif part:IsA("Accessory") and part:FindFirstChild("Handle") then
+                        part.Handle.Color = rainbowColor
+                        part.Handle.Material = Enum.Material.Neon
+                    end
+                else
+                    -- รีเซ็ตกลับเป็นปกติเมื่อปิด
+                    if part:IsA("BasePart") then
+                        part.Material = Enum.Material.Plastic
+                    end
+                end
+            end
+        end
+    end
+
+    -- 3. ขยายหัวผู้เล่นอื่น
+    if headSizeEnabled then
+        for _, player in ipairs(Players:GetPlayers()) do
+            if player ~= LocalPlayer and player.Character then
+                local head = player.Character:FindFirstChild("Head")
+                if head then
+                    head.Size = Vector3.new(headSizeValue, headSizeValue, headSizeValue)
+                    head.Transparency = 0.3
+                    head.CanCollide = false
+                end
+            end
+        end
+    end
+
+    -- 4. ESP (Lines & Boxes)
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer then
+            local character = player.Character
+            if character and character:FindFirstChild("HumanoidRootPart") and character:FindFirstChild("Humanoid") and character.Humanoid.Health > 0 then
+                
+                if not espCache[player] then
+                    local line = Drawing.new("Line")
+                    line.Thickness = 1.5
+                    line.Color = Color3.fromRGB(255, 0, 0)
+                    line.Visible = false
+
+                    local box = Drawing.new("Square")
+                    box.Thickness = 1.5
+                    box.Color = Color3.fromRGB(0, 255, 0)
+                    box.Filled = false
+                    box.Visible = false
+
+                    espCache[player] = {Line = line, Box = box}
+                end
+
+                local cache = espCache[player]
+                local hrp = character.HumanoidRootPart
+                local vector, onScreen = Camera:WorldToViewportPoint(hrp.Position)
+
+                if onScreen then
+                    if espLineEnabled then
+                        cache.Line.From = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y)
+                        cache.Line.To = Vector2.new(vector.X, vector.Y)
+                        cache.Line.Visible = true
+                    else
+                        cache.Line.Visible = false
+                    end
+
+                    if espBoxEnabled then
+                        local headPos = Camera:WorldToViewportPoint(character.Head.Position + Vector3.new(0, 0.5, 0))
+                        local legPos = Camera:WorldToViewportPoint(hrp.Position - Vector3.new(0, 3, 0))
+                        
+                        local height = math.abs(headPos.Y - legPos.Y)
+                        local width = height / 2
+
+                        cache.Box.Size = Vector2.new(width, height)
+                        cache.Box.Position = Vector2.new(vector.X - width / 2, headPos.Y)
+                        cache.Box.Visible = true
+                    else
+                        cache.Box.Visible = false
+                    end
+                else
+                    cache.Line.Visible = false
+                    cache.Box.Visible = false
+                end
+            else
+                removeESP(player)
+            end
+        end
+    end
+end)
